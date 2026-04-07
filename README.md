@@ -6,18 +6,22 @@ A production-grade real-time streaming intelligence system that detects anomalou
 
 ## What it does
 
-A transaction arrives: *user_001 charges KES 4,200 at an electronics store in Lagos.*
+A transaction arrives: *user_002 charges KES 2,500 at an electronics store in Lagos.*
 
 SignalWatch:
-1. Ingests the transaction from the Kafka stream in real time
+1. Ingests the transaction from the Kafka stream in under 100ms
 2. Updates the user's 5-minute sliding window statistics
-3. Computes Z-score, IQR bounds, velocity, and geographic signals
-4. Detects: amount 95σ from mean, foreign country — publishes to anomalies topic
-5. LLM reasoner reads the anomaly and assesses threat context
-6. Response engine issues block, alert, or escalation based on severity
-7. Full audit trail written to PostgreSQL
+3. Detects: amount 21σ from mean + foreign country — publishes to anomalies topic
+4. GPT-4o reasons about the anomaly in context — two coherent signals = critical threat
+5. Response engine issues block with 0.95 confidence
+6. Full audit trail written to PostgreSQL
+7. Live dashboard updates in real time
 
-Total detection latency: under 100ms. LLM reasoning: under 3 seconds.
+---
+
+## Dashboard
+
+![SignalWatch Dashboard](docs/images/dashboard_screenshot.png)
 
 ---
 
@@ -25,27 +29,34 @@ Total detection latency: under 100ms. LLM reasoning: under 3 seconds.
 ```
 TransactionProducer → [transactions topic] → WindowProcessor
                                                     ↓
-                                         AnomalyDetector (Z-score + IQR + geo)
+                              AnomalyDetector (Z-score + IQR + velocity + geographic)
                                                     ↓
                                           [anomalies topic]
                                                     ↓
-                                           LLM Reasoner (GPT-4o)
+                                      GPT-4o LLM Reasoner
                                                     ↓
-                                          ResponseEngine (block/alert/escalate)
+                              ResponseEngine (block / alert / review / monitor)
                                                     ↓
-                                         PostgreSQL audit store
+                                     PostgreSQL audit store
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design decisions and trade-offs.
 
 ---
 
-## Detection methods
+## Evaluation results
 
-| Method | What it catches |
-|--------|----------------|
-| Z-score | Amounts deviating from user's rolling mean |
-| IQR bounds | Outliers in skewed spending distributions |
-| Velocity | Too many transactions in the window |
-| Geographic | Transactions outside user's home country |
+Measured on 23 anomaly events from integration testing:
+
+| Metric | Value |
+|--------|-------|
+| Avg LLM confidence | 0.787 |
+| High confidence rate | 74% |
+| Geographic anomalies | 35% |
+| Action: monitor | 57% |
+| Action: review | 26% |
+| Action: alert | 13% |
+| Action: block | 4% |
 
 ---
 
@@ -53,13 +64,14 @@ TransactionProducer → [transactions topic] → WindowProcessor
 
 | Component | Technology |
 |-----------|------------|
-| Event streaming | Apache Kafka 7.5 |
+| Event streaming | Apache Kafka 7.5 + ZooKeeper |
 | Stream processing | Python kafka-python |
-| Statistical detection | Z-score + IQR (numpy-free, pure Python) |
-| AI reasoning | GPT-4o |
+| Window statistics | Pure Python deque (numpy-free) |
+| Statistical detection | Z-score + IQR + velocity + geographic |
+| AI reasoning | GPT-4o (structured JSON output) |
 | Audit store | PostgreSQL 15 |
 | API | FastAPI |
-| Dashboard | Streamlit (live feed) |
+| Dashboard | Streamlit + Plotly |
 
 ---
 
@@ -72,7 +84,33 @@ pip install -r requirements.txt
 cp .env.example .env
 # Add OPENAI_API_KEY to .env
 docker compose up -d
-python3 streaming/producers/transaction_producer.py
+# Terminal 1 — run the producer
+python3 -m streaming.producers.transaction_producer
+# Terminal 2 — run the dashboard
+streamlit run dashboard/app.py --server.port 8503
+```
+
+---
+
+## API endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| /health | GET | Service health check |
+| /stream/status | GET | Kafka topic stats |
+| /anomalies | GET | Recent anomaly feed |
+| /anomalies/{id} | GET | Full audit detail |
+| /metrics | GET | Detection metrics |
+| /inject | POST | Inject synthetic anomaly |
+
+Interactive docs at `http://localhost:8002/docs`
+
+---
+
+## Running evaluations
+```bash
+python3 evaluation/eval_runner.py
+python3 tests/test_integration.py
 ```
 
 ---
@@ -81,6 +119,6 @@ python3 streaming/producers/transaction_producer.py
 
 | Week | Focus | Status |
 |------|-------|--------|
-| Week 1 | Streaming foundation + detection | Done |
-| Week 2 | AI reasoning + response engine | In progress |
-| Week 3 | Dashboard + evaluation + docs | Upcoming |
+| Week 1 | Kafka streaming + statistical detection | Done |
+| Week 2 | LLM reasoning + response engine + API | Done |
+| Week 3 | Dashboard + evaluation + docs | Done |
