@@ -1,4 +1,4 @@
-# SignalWatch: Real-Time Anomaly Detection and Response Engine
+# SignalWatch:A Real-Time Anomaly Detection and Response Engine
 
 A real-time streaming intelligence system that detects anomalous payment transactions as they happen and uses GPT-4o to reason about whether they represent genuine threats.
 
