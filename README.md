@@ -11,8 +11,8 @@ A transaction arrives: *user_002 charges KES 2,500 at an electronics store in La
 SignalWatch:
 1. Ingests the transaction from the Kafka stream in under 100ms
 2. Updates the user's 5-minute sliding window statistics
-3. Detects: amount 21σ from mean + foreign country — publishes to anomalies topic
-4. GPT-4o reasons about the anomaly in context — two coherent signals = critical threat
+3. Detects: amount 21σ from mean + foreign country ,publishes to anomalies topic
+4. GPT-4o reasons about the anomaly in context , two coherent signals = critical threat
 5. Response engine issues block with 0.95 confidence
 6. Full audit trail written to PostgreSQL
 7. Live dashboard updates in real time
