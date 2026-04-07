@@ -1,6 +1,12 @@
 from streaming.schema import AnomalyEvent
 from reasoning.llm_reasoner import reason_about_anomaly
 from reasoning.threat_classifier import classify_response
+from storage.models import init_db
+from storage.event_store import (
+    store_anomaly_event,
+    store_threat_assessment,
+    store_response_action,
+)
 from response.actions import (
     block_transaction,
     send_fraud_alert,
@@ -63,6 +69,12 @@ def handle_anomaly(event: AnomalyEvent) -> dict:
             transaction_id= tx.transaction_id,
             amount=         tx.amount,
         )
+
+    # Persist everything to the audit trail
+    init_db()
+    store_anomaly_event(event)
+    store_threat_assessment(event.anomaly_id, assessment)
+    store_response_action(event.anomaly_id, decision, result)
 
     return {
         "anomaly_id":   event.anomaly_id,
